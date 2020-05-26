@@ -51,7 +51,7 @@ SECTION MBR vstart=0x7c00   ; 起始地址编译为 0x7c00
 ;;;;;;;;;;;;;;;;从磁盘读取 loader 程序 ;;;;;;;;;;;;;;;;
     mov eax, LOADER_START_SECTOR  ; 
     mov bx, LOADER_BASE_ADDR
-    mov cx, 1   ; 读取的扇区数目
+    mov cx, 4   ; 读取的扇区数目
     call rd_disk_m_16
 
     jmp LOADER_BASE_ADDR
