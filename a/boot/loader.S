@@ -191,7 +191,7 @@ p_mode_start:
    ; 栈"放入"内核虚拟地址空间
    sgdt [gdt_ptr]
    mov ebx, [gdt_ptr + 2]
-   or dword [ebx + 0x18 + 4], 0xc000000 ; 修改video段基址为线性地址
+   or dword [ebx + 0x18 + 4], 0xc0000000 ; 修改video段基址为线性地址
    add dword [gdt_ptr + 2], 0xc0000000
    add esp, 0xc0000000
 
