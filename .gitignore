@@ -1,3 +1,6 @@
 /bochs
 bochs.out
-a/boot/*.bin
+*.bin
+*.o
+
+note

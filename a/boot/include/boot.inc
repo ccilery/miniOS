@@ -3,8 +3,10 @@ LOADER_BASE_ADDR equ 0x900      ; loader程序加载到0x900处
 LOADER_START_SECTOR equ 0x2     ; loader程序从磁盘的第2号扇区开始  LBS逻辑扇区
 LOADER_STACK_TOP equ LOADER_BASE_ADDR
 PAGE_DIR_TABLE_POS equ 0x100000     ; page directory table 的物理地址
-
-
+KERNEL_START_SECTOR equ 0x9
+KERNEL_BIN_BASE_ADDR equ 0x70000    ; 内核文件所在的物理地址
+KERNEL_ENTRY_POINT equ 0xc0001500
+PT_NULL equ 0
 ; 段描述符中的type字段
 STA_X	equ	0x8	    ;Executable segment
 STA_E	equ	0x4	    ;Expand down (non-executable segments)
