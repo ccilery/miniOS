@@ -17,18 +17,19 @@ bootsector:
 loadersector:
 	dd if=a/boot/loader.bin of=bochs/hd60M.img bs=512 count=4 seek=2 conv=notrunc
 clean:
-	rm a/boot/mbr.bin
-	rm a/boot/loader.bin
+	rm build/*
 	rm bochs/hd60M.img
-	rm a/kernel/main.o
-	rm a/kernel/kernel.bin
 boot:
-	nasm -I a/boot/include/ -o a/boot/mbr.bin a/boot/mbr.S 
-	nasm -I a/boot/include/ -o a/boot/loader.bin a/boot/loader.S
-	nasm -f elf32 -o a/lib/kernel/print.o a/lib/kernel/print.S
-	gcc -I a/lib/kernel/ -c a/kernel/main.c -o a/kernel/main.o -m32
-	ld a/kernel/main.o a/lib/kernel/print.o -Ttext 0xc0001500 -e main -o a/kernel/kernel.bin -melf_i386
+	bochs/bin/bximage -hd -mode="flat" -size=60 -q bochs/hd60M.img
+	nasm -I a/boot/include/ -o build/mbr.bin a/boot/mbr.S 
+	nasm -I a/boot/include/ -o build/loader.bin a/boot/loader.S
+	nasm -f elf32 -o build/print.o a/lib/kernel/print.S
+	nasm -f elf32 -o build/kernel.o a/kernel/kernel.S
+	gcc -fno-stack-protector -I a/lib/kernel/ -I a/lib/ -I a/kernel/ -c -fno-builtin a/kernel/interrupt.c -o build/interrupt.o -m32
+	gcc -fno-stack-protector -I a/lib/kernel/ -I a/lib/ -I a/kernel/ -c -fno-builtin a/kernel/init.c -o build/init.o -m32
+	gcc -fno-stack-protector -I a/lib/kernel/ -I a/lib/ -I a/kernel/ -c -fno-builtin a/kernel/main.c -o build/main.o -m32
+	ld -Ttext 0xc0001500 -e main -o build/kernel.bin build/main.o build/init.o build/interrupt.o build/print.o build/kernel.o -melf_i386 
 #	bochs/bin/bximage -hd -mode="flat" -size=60 -q bochs/hd60M.img
-	dd if=a/boot/mbr.bin of=bochs/hd60M.img bs=512 count=1 conv=notrunc  # mbr
-	dd if=a/boot/loader.bin of=bochs/hd60M.img bs=512 count=4 seek=2 conv=notrunc  # loader
-	dd if=a/kernel/kernel.bin of=bochs/hd60M.img bs=512 count=200 seek=9 conv=notrunc  # kernel
+	dd if=build/mbr.bin of=bochs/hd60M.img bs=512 count=1 conv=notrunc  # mbr
+	dd if=build/loader.bin of=bochs/hd60M.img bs=512 count=4 seek=2 conv=notrunc  # loader
+	dd if=build/kernel.bin of=bochs/hd60M.img bs=512 count=200 seek=9 conv=notrunc  # kernel
