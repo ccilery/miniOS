@@ -25,29 +25,27 @@ LIB = -I lib -I lib/kernel -I lib/user -I kernel -I device
 ASFLAGS = -f elf32
 CFLAGS = -Wall $(LIB) -c -fno-stack-protector -W -Wstrict-prototypes -Wmissing-prototypes -fno-builtin -m32
 LDFLAGS = -Ttext $(ENTRY_POINT) -e main -Map $(BUILD_DIR)/kernel.map -melf_i386
-OBJS = $(BUILD_DIR)/main.o $(BUILD_DIR)/init.o  $(BUILD_DIR)/debug.o $(BUILD_DIR)/interrupt.o \
+OBJS = $(BUILD_DIR)/main.o $(BUILD_DIR)/init.o $(BUILD_DIR)/string.o $(BUILD_DIR)/debug.o $(BUILD_DIR)/interrupt.o \
       $(BUILD_DIR)/timer.o $(BUILD_DIR)/kernel.o $(BUILD_DIR)/print.o 
      
 
 ##############   c代码编译     ###############
-$(BUILD_DIR)/main.o: kernel/main.c lib/kernel/print.h \
-        lib/stdint.h kernel/init.h
+$(BUILD_DIR)/main.o: kernel/main.c 
 	$(CC) $(CFLAGS) $< -o $@
 
-$(BUILD_DIR)/init.o: kernel/init.c kernel/init.h lib/kernel/print.h \
-        lib/stdint.h kernel/interrupt.h device/timer.h
+$(BUILD_DIR)/init.o: kernel/init.c 
 	$(CC) $(CFLAGS) $< -o $@
 
-$(BUILD_DIR)/interrupt.o: kernel/interrupt.c kernel/interrupt.h \
-        lib/stdint.h kernel/global.h lib/kernel/io.h lib/kernel/print.h
+$(BUILD_DIR)/interrupt.o: kernel/interrupt.c
 	$(CC) $(CFLAGS) $< -o $@
 
-$(BUILD_DIR)/timer.o: device/timer.c device/timer.h lib/stdint.h\
-         lib/kernel/io.h lib/kernel/print.h
+$(BUILD_DIR)/timer.o: device/timer.c 
 	$(CC) $(CFLAGS) $< -o $@
 
-$(BUILD_DIR)/debug.o: kernel/debug.c kernel/debug.h \
-        lib/kernel/print.h lib/stdint.h kernel/interrupt.h
+$(BUILD_DIR)/debug.o: kernel/debug.c 
+	$(CC) $(CFLAGS) $< -o $@
+
+$(BUILD_DIR)/string.o: lib/string.c 
 	$(CC) $(CFLAGS) $< -o $@
 
 ##############    汇编代码编译    ###############
