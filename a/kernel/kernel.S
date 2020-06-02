@@ -6,21 +6,31 @@
 %define ZERO push 0
 
 extern put_str ; 声明外部函数
-
-section .data
-intr_str db "interrupt occur!", 0xa, 0  ; 回车, '\0'
-
-
+extern idt_table    ; C语言中注册的中断处理程序地址的数组
 
 ; 第一个参数为 中断向量号
 ; 第二个参数为 占位操作, 使得对会压入错误码的中断和不会压入错误码的中断具有统一的处理
 %macro VECTOR 2
 section .text
-intr%1entry:   ; 中断处理程序的入口地址
+intr%1entry:   ; 中断处理程序的入口, 每个中断入口会调用在C程序中注册的中断处理程序
     %2  ; 进入中断处理程序前, 处理器会自动进行压栈操作 (ss, esp, eflags, cs, eip) 以及 error code
-    push intr_str       ; put_str的参数
-    call put_str
+    
+    ;; 在调用C程序中注册的中断处理函数之前, 需要保护上下文
+    push ds
+    push es
+    push fs
+    push gs
+    pushad
+
+    push %1     ; 中断向量号入栈, 中断处理程序的参数
+    call [idt_table + %1 * 4]
+
     add esp, 4          ; 主调函数处理参数
+    popad
+    pop gs
+    pop fs
+    pop es
+    pop ds
 
     mov al, 0x20        ; EOI, 中断结束标记
     out 0xa0, al        ; 向从片写入 OCW2
@@ -33,6 +43,10 @@ section .data
     dd intr%1entry ; 存储中断处理程序的入口地址
 
 %endmacro
+
+
+section .data
+intr_str db "interrupt occur!", 0xa, 0  ; 回车, '\0'
 
 global intr_entry_table     ; 全局符号
 intr_entry_table:

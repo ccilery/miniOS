@@ -220,6 +220,15 @@ enter_kernel:
    mov byte [gs:332], 'e'
    mov byte [gs:334], 'l'
 
+   ; ; 清屏
+   ; mov     ax, 0x600       ; ah 0x06
+   ; mov     bx, 0x700
+   ; mov     cx, 0           ; 左上角: (0, 0)
+   ; mov     dx, 0x184f	   ; 右下角: (80,25),
+   ;              ; VGA文本模式中,一行只能容纳80个字符,共25行。
+   ;              ; 下标从0开始,所以0x18=24,0x4f=79
+   ; int     0x10            ; int 0x10 BIOS中断
+
    jmp KERNEL_ENTRY_POINT
 
 ;------------------ 创建页目录及页表 -----------

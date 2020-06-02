@@ -8,13 +8,6 @@
  *  
  */
 
-#define IDT_DESC_CNT 0x21   // 目前支持的总中断数  33
-
-#define PIC_M_CTRL 0x20     // 主片的控制端口
-#define PIC_M_DATA 0x21     // 主片的数据端口
-#define PIC_S_CTRL 0xa0     // 从片的控制端口
-#define PIC_S_DATA 0xa1     // 从片的数据端口
-
 /*中断门描述符结构体, 低地址->高地址*/
 struct gate_desc    // 8byte
 {
@@ -25,11 +18,13 @@ struct gate_desc    // 8byte
     uint16_t func_offset_high_word; // 中断处理例程在目标代码段中的偏移量(高16位)
 };
 
-static struct gate_desc idt[IDT_DESC_CNT];      // 中断描述符表，中断门描述符的数组
-extern intr_handler intr_entry_table[IDT_DESC_CNT];     // kernel.S中定义, 中断处理例程地址的数组
+char* intr_name[IDT_DESC_CNT];                          // 异常的名字
+static struct gate_desc idt[IDT_DESC_CNT];              // 中断描述符表，中断门描述符的数组
+extern intr_handler intr_entry_table[IDT_DESC_CNT];     // kernel.S中定义, 中断处理例程入口的数组
+intr_handler idt_table[IDT_DESC_CNT];                   // 中断处理程序地址的数组, intr_entry_table[i] ---> idt_table[i]
 
 /*创建中断门描述符*/
-// intr_handler: 中断处理例程的入口地址
+// function: 中断处理例程的入口地址
 static void make_idt_desc(struct gate_desc *p_gdesc, uint8_t attr, intr_handler function)
 {
     p_gdesc->func_offset_low_word = (uint32_t)function & 0xffff;    // 低16位
@@ -46,6 +41,47 @@ static void idt_desc_init()
     for(i = 0; i < IDT_DESC_CNT; i++)
         make_idt_desc(&idt[i], IDT_DESC_ATTR_DPL0, intr_entry_table[i]);
     put_str("    idt_desc_init done\n");
+}
+
+// 默认的中断处理程序, vec_nr 中断向量号
+static void general_intr_handler(uint16_t vec_nr)
+{
+    if(vec_nr == 0x27 || vec_nr == 0x2f)    // 伪中断, 不处理
+        return;
+    put_str("int vector : 0x");
+    put_int(vec_nr);
+    put_char('\n');
+}
+
+ // 异常名初始化, 注册默认的中断处理程序
+static void exception_init()
+{
+    int i;
+    for(i = 0; i < IDT_DESC_CNT; i++)
+    {
+        idt_table[i] = general_intr_handler;    // 注册中断处理程序
+        intr_name[i] = "unknown";
+    }
+    intr_name[0] = "#DE Divide Error";
+    intr_name[1] = "#DB Debug Exception";
+    intr_name[2] = "NMI Interrupt";
+    intr_name[3] = "#BP Breakpoint Exception";
+    intr_name[4] = "#OF Overflow Exception";
+    intr_name[5] = "#BR BOUND Range Exceeded Exception";
+    intr_name[6] = "#UD Invalid Opcode Exception";
+    intr_name[7] = "#NM Device Not Available Exception";
+    intr_name[8] = "#DF Double Fault Exception";
+    intr_name[9] = "Coprocessor Segment Overrun";
+    intr_name[10] = "#TS Invalid TSS Exception";
+    intr_name[11] = "#NP Segment Not Present";
+    intr_name[12] = "#SS Stack Fault Exception";
+    intr_name[13] = "#GP General Protection Exception";
+    intr_name[14] = "#PF Page-Fault Exception";
+    // intr_name[15] 第15项是intel保留项，未使用
+    intr_name[16] = "#MF x87 FPU Floating-Point Error";
+    intr_name[17] = "#AC Alignment Check Exception";
+    intr_name[18] = "#MC Machine-Check Exception";
+    intr_name[19] = "#XF SIMD Floating-Point Exception";
 }
 
 /*初始化8259A*/
@@ -74,7 +110,8 @@ void idt_init()
 {
     put_str("idt_init start\n");
 
-    idt_desc_init();        // 初始化中断描述符表
+    idt_desc_init();        // 初始化中断描述符表  中断处理程序的入口
+    exception_init();       // 异常名初始化, 注册默认的中断处理程序
     pci_init();             // 初始化中断控制器 8259A
 
     /*加载idt到idtr寄存器*/
@@ -82,3 +119,8 @@ void idt_init()
     asm volatile ("lidt %0": : "m"(idt_operand));   // 取64bit中的低48bit
     put_str("idt_init done\n");
 }
+/*
+外部中断发生后, 外设向中断控制器发送中断信号, 中断控制器经过中断仲裁, 将优先级高的中断信号处理为中断向量号发送给CPU, 
+如果CPU没有屏蔽中断, CPU根据中断描述符表寄存器找到中断描述符表的地址, 从中断描述符表找到对应的中断向量, 然后找到中断处理程序的入口,
+中断处理程序的入口处会调用注册的中断处理程序, 处理完, 中断返回.
+*/
