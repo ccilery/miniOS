@@ -21,11 +21,11 @@ ENTRY_POINT = 0xc0001500	# 内核程序的入口
 AS = nasm
 CC = gcc
 LD = ld
-LIB = -I lib -I lib/kernel -I lib/user -I kernel -I device
+LIB = -I lib -I lib/kernel -I lib/user -I kernel -I device -I thread
 ASFLAGS = -f elf32
 CFLAGS = -Wall $(LIB) -c -fno-stack-protector -W -Wstrict-prototypes -Wmissing-prototypes -fno-builtin -m32
 LDFLAGS = -Ttext $(ENTRY_POINT) -e main -Map $(BUILD_DIR)/kernel.map -melf_i386
-OBJS = $(BUILD_DIR)/main.o $(BUILD_DIR)/init.o $(BUILD_DIR)/string.o $(BUILD_DIR)/debug.o $(BUILD_DIR)/interrupt.o \
+OBJS = $(BUILD_DIR)/main.o $(BUILD_DIR)/init.o $(BUILD_DIR)/thread.o $(BUILD_DIR)/string.o $(BUILD_DIR)/debug.o $(BUILD_DIR)/interrupt.o \
       $(BUILD_DIR)/timer.o $(BUILD_DIR)/kernel.o $(BUILD_DIR)/print.o $(BUILD_DIR)/bitmap.o $(BUILD_DIR)/memory.o
      
 
@@ -52,6 +52,9 @@ $(BUILD_DIR)/memory.o: kernel/memory.c
 	$(CC) $(CFLAGS) $< -o $@
 
 $(BUILD_DIR)/bitmap.o: lib/kernel/bitmap.c 
+	$(CC) $(CFLAGS) $< -o $@
+
+$(BUILD_DIR)/thread.o: thread/thread.c 
 	$(CC) $(CFLAGS) $< -o $@
 
 ##############    汇编代码编译    ###############
