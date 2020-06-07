@@ -209,7 +209,7 @@ p_mode_start:
 
 enter_kernel:
    call kernel_init
-   mov esp, 0xc009f000
+   mov esp, 0xc009f000 
 
    mov byte [gs:320], '3'
    mov byte [gs:322], ' '

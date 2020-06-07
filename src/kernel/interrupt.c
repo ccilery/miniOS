@@ -4,9 +4,7 @@
 #include "global.h"
 #include "io.h"
 
-/*
- *  
- */
+extern void set_cursor(int pos);
 
 /*中断门描述符结构体, 低地址->高地址*/
 struct gate_desc    // 8byte
@@ -48,9 +46,30 @@ static void general_intr_handler(uint16_t vec_nr)
 {
     if(vec_nr == 0x27 || vec_nr == 0x2f)    // 伪中断, 不处理
         return;
-    put_str("int vector : 0x");
-    put_int(vec_nr);
-    put_char('\n');
+
+    //重置光标位于左上角, 并清空4行
+    set_cursor(0);
+    int cursor_pos = 0;
+    while(cursor_pos < 320)
+    {
+        put_char(' ');
+        cursor_pos++;
+    }
+    set_cursor(0);
+
+    put_str("!!!!!!!!!!!! exception message begin !!!!!!!!!!!!!!!!\n");
+    set_cursor(88);  // 第2行的第8个字符开始打印
+    put_str(intr_name[vec_nr]);
+    if(vec_nr == 14)    // pagefault
+    {
+        uint32_t page_fault_vaddr = 0;
+        asm volatile("movl %%cr2, %0" : "=r"(page_fault_vaddr)); // cr2存放page fault的地址
+        put_str("\npage fault addr is ");
+        put_int(page_fault_vaddr);
+    } 
+    put_str("\n!!!!!! exception message end !!!!!!!!!!!!!!!!!!!!!!!!!\n");
+
+    while(1);
 }
 
  // 异常名初始化, 注册默认的中断处理程序
@@ -82,6 +101,12 @@ static void exception_init(void)
     intr_name[17] = "#AC Alignment Check Exception";
     intr_name[18] = "#MC Machine-Check Exception";
     intr_name[19] = "#XF SIMD Floating-Point Exception";
+}
+
+// vec_nr号中断安装中断处理程序
+void register_handler(uint8_t vec_nr, intr_handler function)
+{
+    idt_table[vec_nr] = function;
 }
 
 /*初始化8259A*/
@@ -134,7 +159,6 @@ enum intr_status intr_enable(void)
     old_status = intr_get_status();
     if(old_status == INTR_OFF)
         asm volatile("sti");    // 开中断
-
     return old_status;
 }
 
@@ -145,7 +169,6 @@ enum intr_status intr_disable(void)
     old_status = intr_get_status();
     if(old_status == INTR_ON)
         asm volatile("cli");    // 关中断
-
     return old_status;
 }
 

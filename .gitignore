@@ -1,7 +1,9 @@
 bochs/
 .vscode/
 src/build
+src/.gdbinit
 test/
+gbochs/
 
 note
 

@@ -1,6 +1,6 @@
 #ifndef __KERNEL_INTERRUPT_H
 #define __KERNEL_INTERRUPT_H
-
+#include "stdint.h"
 //-------------------------------- 中断初始化 ----------------------
 #define IDT_DESC_CNT 0x21   // 目前支持的总中断数  33
 
@@ -10,8 +10,9 @@
 #define PIC_S_CTRL 0xa0     // 从片的控制端口
 #define PIC_S_DATA 0xa1     // 从片的数据端口
 
-typedef void* intr_handler;     // 中断处理程序的入口地
+typedef void* intr_handler;     // 中断处理程序的入口地址
 void idt_init(void);
+void register_handler(uint8_t vec_nr, intr_handler function);
 
 //------------------------------- 中断状态的一些操作 -----------------
 #define EFLAGS_IF 0x00000200    // eflags寄存器中的IF为1, 开中断

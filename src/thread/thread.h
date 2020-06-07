@@ -2,6 +2,7 @@
 #define __THREAD_THREAD_H
 
 #include "stdint.h"
+#include "list.h"
 
 typedef void (*thread_func)(void*);     // 函数指针类型
 
@@ -16,7 +17,7 @@ enum task_status
     TASK_DIED
 };
 
-// 中断栈
+// 中断栈, 中断处理程序保护上下文现场, 压入到此结构
 struct intr_stack
 {
     // kernel.S
@@ -65,13 +66,28 @@ struct thread_stack
 // pcb
 struct task_struct
 {
-    uint32_t* self_kstack;
+    uint32_t* self_kstack;      // 线程的0级特权栈（内核栈）
     enum task_status status;
-    uint8_t priority;
     char name[16];
-    uint32_t stack_magic;   // 因为线程的0特权级栈在pcb中, stack_magic用来分割 kstack 和 线程信息
+    
+    uint8_t priority;           // 优先级用线程被调度时需要执行的时钟中断数表示, 任务被换下时, 用priority赋值给ticks
+    uint8_t ticks;              // 任务被调度到CPU上要执行的时钟中断数, 每1次时钟中断则减1,减为0则换下
+    uint32_t elapsed_ticks;     // 此任务自第一次被CPU调度, 共执行的时钟中断数
+
+    // tag加入到内核维护的任务队列, 内核中的任务队列用宏处理tag得到PCB的地址
+    struct list_elem general_tag;       // 加入到 就绪队列或其他等待队列中
+    struct list_elem all_list_tag;      // 加入到所有任务的队列
+
+    uint32_t* pgdir;            // 进程页表的虚拟地址, 线程没有页表, 为NULL
+    uint32_t stack_magic;       // 因为线程的0特权级栈在pcb中, stack_magic用来分割 
 };
 
+#define STACK_MAGIC 0x12345678
 
+// 获取当前运行线程的PCB地址
+struct task_struct* running_thread(void);   
 struct task_struct* thread_start(char* name, int prio, thread_func function, void* func_arg);
+// 任务调度
+void schedule(void);
+void thread_init(void);
 #endif // __THREAD_THREAD_H

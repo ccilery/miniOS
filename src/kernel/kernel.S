@@ -5,9 +5,9 @@
 ; 中断发生时，不会压入错误码, 压入一个32位的数，使得压入错误码的中断和不压入错误码的中断 的栈结构中栈顶指针相同
 %define ZERO push 0
 
-extern put_str ; 声明外部函数
 extern idt_table    ; C语言中注册的中断处理程序地址的数组
 
+; 每一个中断向量号对应的中断处理程序会调用C程序中注册的中断处理程序
 ; 第一个参数为 中断向量号
 ; 第二个参数为 占位操作, 使得对会压入错误码的中断和不会压入错误码的中断具有统一的处理
 %macro VECTOR 2
@@ -22,8 +22,12 @@ intr%1entry:   ; 中断处理程序的入口, 每个中断入口会调用在C程
     push gs
     pushad
 
-    push %1     ; 中断向量号入栈, 中断处理程序的参数
-    call [idt_table + %1 * 4]
+    mov al, 0x20        ; EOI, 中断结束标记
+    out 0xa0, al        ; 向从片写入 OCW2
+    out 0x20, al        ; 向主片写入 OCW2
+    
+    push %1     ; 中断向量号入栈, C程序中注册的中断处理程序的参数
+    call [idt_table + %1 * 4]   ; C程序中注册的中断处理程序
 
     add esp, 4          ; 主调函数处理参数
     popad
@@ -31,11 +35,7 @@ intr%1entry:   ; 中断处理程序的入口, 每个中断入口会调用在C程
     pop fs
     pop es
     pop ds
-
-    mov al, 0x20        ; EOI, 中断结束标记
-    out 0xa0, al        ; 向从片写入 OCW2
-    out 0x20, al        ; 向主片写入 OCW2
-
+    
     add esp, 4          ; 跳过错误码或占位符
     iret
 
@@ -49,8 +49,8 @@ section .data
 intr_str db "interrupt occur!", 0xa, 0  ; 回车, '\0'
 
 global intr_entry_table     ; 全局符号
-intr_entry_table:
-                ; 所有的宏展开后, 所有的.data会合并成一个segment, 在内存地址连续
+intr_entry_table:   ; 中断处理程序入口地址的数组
+                    ; 所有的宏展开后, 所有的.data会合并成一个segment, 在内存地址连续
 VECTOR 0x00,ZERO
 VECTOR 0x01,ZERO
 VECTOR 0x02,ZERO
