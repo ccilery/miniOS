@@ -4,6 +4,12 @@ src/build
 src/.gdbinit
 test/
 gbochs/
+tiny-os-master/
+terminal_with_lock/
+tool/
+code/
+
+
 
 note
 

@@ -77,19 +77,19 @@ static void mem_pool_init(uint32_t all_mem)
     put_str("    mem_pool_init done\n");
 }
 
-// 在pf物理内存池中 **连续分配** pg_cnt个物理页, 返回虚拟地址
+// 在pf虚拟内存池中 **连续分配** pg_cnt个虚拟页, 返回虚拟地址
 static void* vaddr_get(enum pool_flags pf, uint32_t pg_cnt)
 {
     int vaddr_start = 0, bit_idx_start = -1;
     uint32_t cnt = 0;
     if(pf == PF_KERNEL)
     {
-        bit_idx_start = bitmap_scan(&kernel_pool.pool_bitmap, pg_cnt);
+        bit_idx_start = bitmap_scan(&kernel_vaddr.vaddr_bitmap, pg_cnt);
         // ASSERT(bit_idx_start != -1);
         if(bit_idx_start == -1)
             return NULL;
         while(cnt < pg_cnt)     // 修改标识为已分配
-            bitmap_set(&kernel_pool.pool_bitmap, bit_idx_start + cnt++, 1);
+            bitmap_set(&kernel_vaddr.vaddr_bitmap, bit_idx_start + cnt++, 1);
         vaddr_start = kernel_vaddr.vaddr_start + bit_idx_start * PG_SIZE;
     }
     else

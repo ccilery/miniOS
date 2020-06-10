@@ -11,7 +11,6 @@ struct task_struct* main_thread;    // 主线程的PCB
 struct list thread_ready_list;     // 任务就绪队列
 struct list thread_all_list;       // 所有任务队列
 static struct list_elem* thread_tag;    // 保存队列中的节点，用于 list_elem 转换为 task_struct
-static struct task_struct* next;
 
 extern void switch_to(struct task_struct* cur, struct task_struct* next);
 
@@ -34,7 +33,7 @@ static void thread_create(struct task_struct* thread, thread_func function, void
     // 留出 intr_stack的空间
     
     thread->self_kstack -= sizeof(struct intr_stack);
-    put_int((uint32_t)thread->self_kstack);
+    // put_int((uint32_t)thread->self_kstack);
     // 留出 thread_stack的空间
     thread->self_kstack -= sizeof(struct thread_stack);
     // 初始化 thread_stack的空间
@@ -50,14 +49,14 @@ static void init_thread(struct task_struct* thread, char* name, int prio)
 {
     memset(thread, 0, sizeof(*thread));
     strcpy(thread->name, name);
-    thread->priority = prio;
-    thread->ticks = prio;
-    thread->elapsed_ticks = 0;
-    thread->self_kstack = (uint32_t*)((uint32_t)thread + PG_SIZE);  // pcb的栈顶
     if(thread == main_thread)       // 主线程
         thread->status = TASK_RUNNING;
     else 
         thread->status = TASK_READY;
+    thread->priority = prio;
+    thread->ticks = prio;
+    thread->elapsed_ticks = 0;
+    thread->self_kstack = (uint32_t*)((uint32_t)thread + PG_SIZE);  // pcb的栈顶
     thread->pgdir = NULL;
     thread->stack_magic = STACK_MAGIC;
 }
@@ -91,10 +90,7 @@ struct task_struct* thread_start(char* name, int prio, thread_func function, voi
 static void make_main_thread(void)
 {
     main_thread = running_thread(); // pcb地址, 0x9e000~0x9f000, 不需要另分配一页
-    put_str("\n\nmake_main_thread\n");
-    put_int((uint32_t)main_thread);
-    put_char('\n');
-    init_thread(main_thread, "main", 31);
+    init_thread(main_thread, "main", 10);
 
     //main线程是当前线程, 不在 thread_ready_list 中
     ASSERT(!elem_find(&thread_all_list, &main_thread->all_list_tag));
@@ -102,32 +98,60 @@ static void make_main_thread(void)
 }
 
 // 任务调度: 时间片用完/阻塞
-void schedule()
-{
+void schedule() {
+    ASSERT(intr_get_status() == INTR_OFF);
+
+    struct task_struct* cur_thread = running_thread();
+    if (cur_thread->status == TASK_RUNNING) {
+        // 时间片用完，重新加到就绪队列
+        ASSERT(!elem_find(&thread_ready_list, &cur_thread->general_tag));
+        list_append(&thread_ready_list, &cur_thread->general_tag);
+        cur_thread->ticks = cur_thread->priority;
+        cur_thread->status = TASK_READY;
+    }
     
-    ASSERT(intr_get_status() == INTR_OFF);  // 中断处理程序中调用, 中断处理时关中断
+    // 当前没有实现idle线程，所以要保证必须有可调度的线程存在
+    ASSERT(!list_empty(&thread_ready_list));
+
+    thread_tag = NULL;
+    thread_tag = list_pop(&thread_ready_list);
+    struct task_struct* next = elem2entry(struct task_struct, general_tag, thread_tag);
+    next->status = TASK_RUNNING;
+    
+    switch_to(cur_thread, next);
+}
+
+/**
+ * 阻塞当前线程.
+ */ 
+void thread_block(enum task_status status) {
+    ASSERT(status == TASK_BLOCKED || status == TASK_HANGING || status == TASK_WAITING);
+
+    enum intr_status old_status = intr_disable();
 
     struct task_struct* cur = running_thread();
-    if(cur->status == TASK_RUNNING)     // 时间片用完
-    {
-        ASSERT(!elem_find(&thread_ready_list, &cur->general_tag));   // 就绪队列中不存在
-        list_append(&thread_ready_list, &cur->general_tag);          // 加入到就绪队列
-        cur->ticks = cur->priority;     // 恢复时间片
-        cur->status = TASK_READY;
+    cur->status = status;
+    schedule();
+
+    // 等到当前线程再次被调度时才能执行下面的语句
+    // 调度的其它线程无非两种情况:
+    // 1. 如果第一次执行，那么在kernel_thread方法中第一件事就是开中断
+    // 2. 如果不是第一次执行，那么通过中断返回的方式继续执行，而iret执行也会再次开中断
+    intr_set_status(old_status);
+}
+
+void thread_unblock(struct task_struct* pthread) {
+    enum intr_status old_status = intr_disable();
+
+    ASSERT(pthread->status == TASK_BLOCKED || pthread->status == TASK_HANGING || pthread->status == TASK_WAITING);
+
+    if (pthread->status != TASK_READY) {
+        ASSERT(!elem_find(&thread_ready_list, &pthread->general_tag));
+        list_push(&thread_ready_list, &pthread->general_tag);
+        pthread->status = TASK_READY;
     }
-    else    // 阻塞
-    {
-        // 不需要加入到就绪队列
-    }
-    // put_str("schedule...\n");
-    ASSERT(!list_empty(&thread_ready_list));     // 就绪队列不为空
-    thread_tag = NULL;      // 即将被调度的线程
-    thread_tag = list_pop(&thread_ready_list);
-    // 将结构体中tag的地址转换为结构体的地址
-    // struct task_struct* next = elem2entry(struct task_struct, general_tag, thread_tag);
-    next = elem2entry(struct task_struct, general_tag, thread_tag);
-    next->status = TASK_RUNNING;
-    switch_to(cur, next);       // cur线程切换为next线程
+
+    intr_set_status(old_status);
 }
 
 void thread_init()

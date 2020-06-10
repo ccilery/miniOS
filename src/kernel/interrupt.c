@@ -4,7 +4,6 @@
 #include "global.h"
 #include "io.h"
 
-extern void set_cursor(int pos);
 
 /*中断门描述符结构体, 低地址->高地址*/
 struct gate_desc    // 8byte
@@ -140,7 +139,7 @@ void idt_init(void)
     pci_init();             // 初始化中断控制器 8259A
 
     /*加载idt到idtr寄存器*/
-    uint64_t idt_operand = (sizeof(idt) - 1) | ((int64_t)(uint32_t)idt << 16);
+    uint64_t idt_operand = (sizeof(idt) - 1) | ((uint64_t)(uint32_t)idt << 16);
     asm volatile ("lidt %0": : "m"(idt_operand));   // 取64bit中的低48bit
     put_str("idt_init done\n");
 }
@@ -152,36 +151,44 @@ void idt_init(void)
 
 //-------------------------------------- 中断状态的一些操作函数 --------------------------
 
-// 开中断并返回开中断前的状态
-enum intr_status intr_enable(void)
-{
+/**
+ * 开中断并返回之前的状态.
+ */ 
+enum intr_status intr_enable() {
     enum intr_status old_status;
-    old_status = intr_get_status();
-    if(old_status == INTR_OFF)
-        asm volatile("sti");    // 开中断
+    if (INTR_ON == intr_get_status()) {
+        old_status = INTR_ON;
+	    return old_status;
+    }
+
+    old_status = INTR_OFF;
+    asm volatile ("sti");
     return old_status;
 }
 
-// 关中断并返回关中断前的状态
-enum intr_status intr_disable(void)
-{
+/**
+ * 关中断并返回之前的状态.
+ */
+enum intr_status intr_disable() {
     enum intr_status old_status;
-    old_status = intr_get_status();
-    if(old_status == INTR_ON)
-        asm volatile("cli");    // 关中断
+    if (INTR_OFF == intr_get_status()) {
+        old_status = INTR_OFF;
+        return old_status;
+    }
+
+    old_status = INTR_ON;
+    asm volatile ("cli" : : : "memory");
     return old_status;
 }
-
-// 设置中断状态, 并返回之前的状态
-enum intr_status intr_set_status(enum intr_status status)
-{
-    return status == INTR_ON ? intr_enable() : intr_disable();
-}
-
-// 获取当前中断状态
-enum intr_status intr_get_status(void)
-{
+/**
+ * 获取中断状态.
+ */ 
+enum intr_status intr_get_status() {
     uint32_t eflags = 0;
     GET_EFLAGS(eflags);
-    return (eflags & EFLAGS_IF) == 0 ? INTR_OFF : INTR_ON;
+    return (EFLAGS_IF & eflags) ? INTR_ON : INTR_OFF;
+}
+
+enum intr_status intr_set_status(enum intr_status status) {
+    return status & INTR_ON ? intr_enable() : intr_disable();
 }
